@@ -1,0 +1,57 @@
+This file contains the results of compromission of the entities in the V2X SCMS proposal.
+To verify entity compromise we sent on the pub_ch the private key of the compromised entity
+out(pub_ch, entity_pri_key)
+
+-PROVISIONING--------------------------------------------------------------------------------
+
+#Attacker gets entrollment certificate
+-Query not event(Sent_Valid_Attacker_Cert_ECA(aecert)) is false. <-certificate obtained
+-Query not attacker(scrt[]) is false. <- Attacker is able to get a pseudonym certificate
+-Query event(Received_Valid_Pseudonym_Request_RA(request)) ==> event(Sent_Valid_Pseudonym_Request_OBE(request)) is false. <-Attacker can send requests to RA using the obtined enrollment cert.
+-Query event(Received_Valid_Message(message_1)) ==> event(Sent_Valid_Message(message_1)) is false. <-Attacker is able to send valid messages to other OBEs
+
+#Attacker gets entrollment certificate and rootCA is compromised
+-Same as before, ProVerif is not able to model a complex attack like this.
+
+#ECA private key is leaked
+-Nothing to note, the effect is the same as the first test
+
+#RA private key is leaked
+-Query not attacker(scrt[]) is false.<-attacker can get the secret tag from the PCA, but the butterfly seeds are secure
+-Query not attacker(a_seed[]) is true.
+-Query event(Received_Valid_Pseudonym_Request_PCA(request)) ==> event(Sent_Valid_Pseudonym_Request_RA(request)) is false. <- attacker is able to spoof the RA
+-Query event(Received_Valid_Message(message_1)) ==> event(Sent_Valid_Message(message_1)) is false.<-Attacker can perform a MitM attack spoofing the RA and getting the enrollment cert which can be used to get certificates (but enrollment can be done only once!)
+
+#PCA private key is leaked
+-Query inj-event(Received_Valid_Pseodonym_Certificate_OBE(certificate)) ==> inj-event(Sent_Valid_Pseodonym_Certificate_PCA(certificate)) is false. <-Attacker can craft fake responses
+-Query not attacker(scrt[]) is true.<-still the true responses remain confidential
+
+#LA private key is leaked
+-Query event(received_plv_from_la1_RA(plv)) ==> event(sent_plv_from_LA(plv)) is false. <-the attacker can send arbitrary Pre-linkage values.
+
+
+#Attacker is able to clone a correctly enrolled ECU(a_seed, h_seed, fk, fe)
+-Query not attacker(scrt[]) is false.
+-Query not attacker(a_seed[]) is false.
+-Query event(Received_Valid_Message(message_1)) ==> event(Sent_Valid_Message(message_1)) is false. <-attacker can craft messages for other OBEs and also get pseudonym certs.
+
+#enrollment anonimity is preserved even with compromises
+
+#pseudocert anonimity cannot be verified due to resource constraints
+
+#observational equivalence in the pre-linkage values is preserved
+
+-MISBEHAVIOUR------------------------------------------------------------------------------
+
+#MA private key is leaked
+-Query inj-event(Received_Linkage_Value_PCA(request_1)) ==> inj-event(Sent_Linkage_Value_MA(request_1)) is false. <-Attacker can spoof MA
+-Query inj-event(Received_Hash_Value_RA(request_1)) ==> inj-event(Sent_Hash_Value_MA(request_1)) is false.<-Attacker can spoof MA, revoking OBEs
+
+#PCA private key is leaked
+-Query inj-event(Received_Hash_Value_MA(response_1)) ==> inj-event(Sent_Hash_Value_PCA(response_1)) is false. <-attacker can spoof the PCA
+-Query inj-event(Received_Hash_Value_RA(request_1)) ==> inj-event(Sent_Hash_Value_MA(request_1)) is false. <-attacker can then get the signed request from MA and send to RA, passing the check on the signature and inserting arbitrary messages into the CRL
+
+#RA private key is leaked
+-In the simplified implementation RA does not send messages
+(Experimental) if enrollment cert is used to sign report and ra is compromised atk can get obe enrollment cert
+-Query event(Received_Report_MA(lv)) ==> event(Sent_Report_OBE(lv)) is false.
