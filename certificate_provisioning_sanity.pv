@@ -11,6 +11,7 @@
 		8. Authentication of the Ra to the Pca
 		9. Authentication of the Pca to the vehicle
 		10. Only honest vehicles can send valid messages
+		11. Butterfly key expansion seed is secret.
 *)
 (* ----------------------------------------------------------------------------- *)
 (* ProVerif SCMS Pseudonym Certificate Provisioning                               *)
@@ -31,6 +32,7 @@ Verification summary:
 9.1.Query event(Received_Valid_Pseodonym_Certificate_OBE(certificate)) ==> event(Sent_Valid_Pseodonym_Certificate_PCA(certificate)) is true.
 9.2.Query inj-event(Received_Valid_Pseodonym_Certificate_OBE(certificate)) ==> inj-event(Sent_Valid_Pseodonym_Certificate_PCA(certificate)) is true.
 10.	Query event(Received_Valid_Message(message_1)) ==> event(Sent_Valid_Message(message_1)) is true.
+11.	Query not attacker(a_seed[]) is true.
 ----------------------------------------------------------------------------------------------------------------------------
 *)
 
