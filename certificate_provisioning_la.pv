@@ -1,6 +1,6 @@
 (*
 	This file contains the implementation in ProVerif of the SCMS Pseudonym Certificate provisioning phase. 
-  	A simple modification was mad in order to authenticate the LAs to the RA and PCA. The values are signed, this does not prevent replays.
+  	A simple modification was made in order to authenticate the LAs to the RA and PCA. The values are signed, this does not prevent replays.
 	The following properties are checked:
 		1. LAs send signed values to the RA
 		2. the pre linkage value should remain secret

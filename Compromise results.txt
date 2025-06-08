@@ -11,7 +11,7 @@ out(pub_ch, entity_pri_key)
 -Query event(Received_Valid_Message(message_1)) ==> event(Sent_Valid_Message(message_1)) is false. <-Attacker is able to send valid messages to other OBEs
 
 #Attacker gets entrollment certificate and rootCA is compromised
--Same as before, ProVerif is not able to model a complex attack like this.
+-Authentication fails for every entity, the attacker is able to replace every component in the SCMS taking full control of the infrastructure.
 
 #ECA private key is leaked
 -Nothing to note, the effect is the same as the first test
@@ -50,8 +50,3 @@ out(pub_ch, entity_pri_key)
 #PCA private key is leaked
 -Query inj-event(Received_Hash_Value_MA(response_1)) ==> inj-event(Sent_Hash_Value_PCA(response_1)) is false. <-attacker can spoof the PCA
 -Query inj-event(Received_Hash_Value_RA(request_1)) ==> inj-event(Sent_Hash_Value_MA(request_1)) is false. <-attacker can then get the signed request from MA and send to RA, passing the check on the signature and inserting arbitrary messages into the CRL
-
-#RA private key is leaked
--In the simplified implementation RA does not send messages
-(Experimental) if enrollment cert is used to sign report and ra is compromised atk can get obe enrollment cert
--Query event(Received_Report_MA(lv)) ==> event(Sent_Report_OBE(lv)) is false.

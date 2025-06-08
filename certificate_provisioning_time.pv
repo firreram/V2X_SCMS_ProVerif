@@ -1,5 +1,6 @@
 (*
 	This file contains the implementation in ProVerif of the SCMS Pseudonym Certificate provisioning phase. 
+	Time queries are inserted in order to verify the uniqueness of the requests and responses in the system.
 	The following properties are checked:
 		1.The OBE pseudonym cert. request is unique and cannot be repeated.
 		2.The request is unique and cannot be repeated, parameters should be unique for each request OBE->RA.

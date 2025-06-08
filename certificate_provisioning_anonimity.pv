@@ -1,6 +1,6 @@
 (*
 	This file contains the implementation in ProVerif of the SCMS Pseudonym Certificate provisioning phase. 
-  	A simple modification was mad in order to authenticate the LAs to the RA and PCA. The values are signed, this does not prevent replays.
+  	Anonimity of the enrollment process is verified through observational equivalence inserting a choice between the key material used to create the OBE enrollment certificate.
 	The following properties are checked:
 		1. Anonimity of the enrollment process
 *)

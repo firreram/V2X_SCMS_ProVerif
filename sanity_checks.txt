@@ -1,0 +1,48 @@
+Sanity checks for V2X SCMS:
+1. Bootstrapping (Enrollment Certificate Provisioning)
+    1.1. OBE gets enrollment certificate from SCMS
+    1.2. OBE gets ECA certificate from SCMS
+    1.3. OBE gets RA certificate from SCMS
+    1.4. ATK gets enrollment certificate from SCMS (is there some kind of OBE id? YES)(Rebootstrap only possible solution)
+    1.5. ATK gets many enrollment certificates from SCMS !!! (fattibile ma il sistema non controlla gli id!)
+    1.6. Revocation of ECA (requires electors)(che non sono modellati, quindi nulla)
+OK 
+
+
+2. Pseudonym Certificate Provisioning
+    2.1. Verify that the SCMS is able to provision the V2X devices with the necessary certificates.
+    2.2. Verify that the SCMS is able to revoke the pseudonym certificates of the V2X devices. (check CRL implementation for linkage values)
+    2.3. attacker tries to get pseudonym certificate from SCMS, even if in CRL (enrollment cert. is in CRL)
+    2.4. RA tries to read Pseudonym cert. (relay PCA->OBE)
+    2.5. OBE correctly reads Pseudonym cert.
+    2.6. PCA does not know pseudo. cert. recipient.
+    2.7. LA should not be able to track devices
+    2.8. OBE sends certificate request (butterfly seeds)
+    2.9. OBE sends certificate request (butterfly seeds) with wrong signature
+    2.10. OBE sends certificate request (butterfly seeds) with revoked ECA certificate
+
+3. Misbehavior reporting (PROVARE A SEPARARE LE FASI!)
+    3.1. MA publishes linkage values (revocation of future pseudonym certificates)
+    3.2. OBEs send Misbehavior reports to MA (via RA)
+    3.3. Check correct CRL information is created
+
+4. Revocation
+    4.1. Verify that the SCMS is able to revoke the pseudo certificates of the V2X devices.
+    4.2. Verify that the SCMS is able to blacklist the enrollment certificates of the V2X devices.
+    4.3. backwards privacy of revoked pseudonym certificates is maintained
+
+5. Normal operations
+    5.1. OBE messages correctly signed(hash(msg+cert))
+    5.2. OBE messages discarded if pseudonym certificate is revoked
+    5.3. OBE messages revoked if PCA revoked
+
+-CONTROLLARE REACHABILITY con modifica LA
+
+IMPLEMENTED checks
+rename time!!!
+
+
+
+
+RESULTS
+

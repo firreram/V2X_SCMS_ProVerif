@@ -1,8 +1,17 @@
 (*
 	This file contains the implementation in ProVerif of the SCMS Pseudonym Certificate provisioning phase. 
-  	A choice between two linkage values is made to ensure unlinkability of the pseudonym certificates created by the pseudonym certificate authority (PCA).
+  	This file is specifically written to emulate rootCA compromission and includes the necessary modifications(full certificate chain verification and certificates retrieved from the public channel).
 	The following properties are checked:
-		1.Observational equivalence of the sent linkage values created by the PCA.
+		1. ECA sends enrollment certificate to OBE
+		2. Attacker gets enrollment certificate from SCMS
+		3. Valid messages are exchanged between OBEs
+		4. Certificates are never revoked
+		5. Only LA sends linkage values to RA
+		6. PCA response for OBE is secret
+		7. Ra can receive pseudonym requests only from honest vehicles
+		8. Authentication of the Ra to the Pca
+		9. Authentication of the Pca to the vehicle
+		10. Only honest vehicles can send valid messages
 *)
 (* ----------------------------------------------------------------------------- *)
 (* ProVerif SCMS Pseudonym Certificate Provisioning                               *)
@@ -10,10 +19,10 @@
 (*
 Verification summary:
 
-Cannot be proven. Then ProVerif crashes.
 
 ----------------------------------------------------------------------------------------------------------------------------
 *)
+
 (* Types Definition                                                              *)
 type keymat.                                    (*` Key Material                 *)
 type key.                                       (*` Symmetric key                *)
@@ -32,6 +41,10 @@ free pub_ch:channel.                            (*` the public channel          
 free pri_ch:channel  [private].                 (*` the private channel          *)
 free report_ch:channel.                         (*` the report channel           *)
 
+(* secret test value *)
+free scrt:bitstring [private].
+free attacker_id:bitstring.
+free a_seed:bitstring [private].
 
 (* Tables                                                                        *)
 table pca_table(bitstring, bitstring, bitstring, bitstring, cert).
@@ -59,10 +72,10 @@ fun but_keymat(bitstring, bitstring): keymat.
 fun but_to_pub_key(bitstring): pub_key.
 fun but_to_pri_key(bitstring): pri_key.
 fun make_linkage_value(bitstring, bitstring): bitstring.
-fun time_linkage_value(bitstring, bitstring): bitstring.
+fun datetime_linkage_value(bitstring, bitstring): bitstring.
 
 (* Generic Cert                                                                  *)
-fun make_cert(bitstring, pub_key, pri_key):cert [private].
+fun make_cert(bitstring, pub_key, pri_key):cert.
 reduc forall id:bitstring, pub:pub_key, pri:pri_key; get_cert_pub_key(make_cert(id, pub, pri)) = pub.
 reduc forall id:bitstring, pub:pub_key, pri:pri_key; get_cert_id(make_cert(id, pub, pri)) = id.
 reduc forall id:bitstring, pub:pub_key, smat:keymat; check_cert(make_cert(id, pub, gen_pri_key(smat)), gen_pub_key(smat)) = ok().
@@ -74,51 +87,80 @@ reduc forall m:bitstring, a:bitstring, b:bitstring, c:bitstring; but_check_sign(
 (* HASH    *)
 fun hash(bitstring): bitstring.
 
-(* Events Definition *)
+(* events *)
 event Sent_Valid_Pseudonym_Request_OBE(bitstring).
 event Received_Valid_Pseudonym_Request_RA(bitstring).
 event Sent_Valid_Pseudonym_Request_RA(bitstring).
 event Received_Valid_Pseudonym_Request_PCA(bitstring).
 event Sent_Valid_Pseodonym_Certificate_PCA(cert).
 event Received_Valid_Pseodonym_Certificate_OBE(cert).
+
 event Sent_Valid_Message(bitstring).
 event Received_Valid_Message(bitstring).
+
 event Message_Discarded_Revoked_Certificate(bitstring).
+
 event Sent_Linkage_Value_MA(bitstring).
 event Received_Linkage_Value_PCA(bitstring).
 event Sent_Hash_Value_PCA(bitstring).
 event Received_Hash_Value_MA(bitstring).
 event Sent_Hash_Value_MA(bitstring).
 event Received_Hash_Value_RA(bitstring).
+
 event Extracted_Hash_Request_PCA(bitstring).
+
 event Add_to_CRL(bitstring).
+
 event received_plv_from_la1_RA(bitstring).
 event received_plv_from_la2_RA(bitstring).
 event sent_plv_from_LA(bitstring).
+event Publish_Cert_RA(cert).
+event Publish_Cert_ECA(cert).
 
-(*DEBUG*)
-(*
-query a:bitstring; event(Sent_Valid_Pseudonym_Request_OBE(a)).
-query b:bitstring; event(Received_Valid_Pseudonym_Request_RA(b)).
-query c:bitstring; event(Sent_Valid_Pseudonym_Request_RA(c)).
-query d:bitstring; event(Received_Valid_Pseudonym_Request_PCA(d)).
-query e:cert; event(Sent_Valid_Pseodonym_Certificate_PCA(e)).
-query f:cert; event(Received_Valid_Pseodonym_Certificate_OBE(f)).
-query g:bitstring; event(Sent_Valid_Message(g)).
-query h:bitstring; event(Received_Valid_Message(h)).
-query i:bitstring; event(Message_Discarded_Revoked_Certificate(i)).
-query j:bitstring; event(Sent_Linkage_Value_MA(j)).
-query k:bitstring; event(Received_Linkage_Value_PCA(k)).
-query l:bitstring; event(Sent_Hash_Value_PCA(l)).
-query m:bitstring; event(Received_Hash_Value_MA(m)).
-query n:bitstring; event(Sent_Hash_Value_MA(n)).
-query o:bitstring; event(Received_Hash_Value_RA(o)).
-query p:bitstring; event(Extracted_Hash_Request_PCA(p)).
-query q:bitstring; event(Add_to_CRL(q)).
-query r:bitstring; event(received_plv_from_la1_RA(r)).
-query s:bitstring; event(received_plv_from_la2_RA(s)).
-query t:bitstring; event(sent_plv_from_LA(t)).
-*)
+(* sanity checks --------------------------------*)
+
+query request:bitstring; event(Received_Valid_Pseudonym_Request_RA(request)).
+
+event Sent_Valid_Enrollment_Cert_ECA(cert).
+(* OBE gets enrollment certificate from SCMS *)
+query ecert:cert; event(Sent_Valid_Enrollment_Cert_ECA(ecert)).
+
+event Sent_Valid_Attacker_Cert_ECA(cert).
+(* ATK gets enrollment certificate from SCMS *)
+query aecert:cert; event(Sent_Valid_Attacker_Cert_ECA(aecert)).
+
+
+query msg:bitstring; event(Sent_Valid_Message(msg)).
+query msg:bitstring; event(Received_Valid_Message(msg)).
+
+query certid:bitstring; event(Message_Discarded_Revoked_Certificate(certid)).
+
+(* LA sends linkage values to RA, expected: false (values are not authenticated) *)
+query plv:bitstring; event(received_plv_from_la1_RA(plv))==>event(sent_plv_from_LA(plv)).
+query plv:bitstring; event(received_plv_from_la2_RA(plv))==>event(sent_plv_from_LA(plv)).
+
+(* A tag is inserted in the message fo the OBE by the PCA, NO ONE should be able to read the response, other than the OBE itself *)
+query attacker(scrt).
+(* Test if the seeds fot the butterfly key expansions are secure *)
+query attacker(a_seed).
+
+(* Ra can receive pseudonym requests only from honest vehicles - expected: false (if the attacker has a valid enrollment certificate) *)
+query request:bitstring; event(Received_Valid_Pseudonym_Request_RA(request)) ==> event(Sent_Valid_Pseudonym_Request_OBE(request)).
+
+(* Authentication of the Ra to the Pca *)
+query request:bitstring; event(Received_Valid_Pseudonym_Request_PCA(request)) ==> event(Sent_Valid_Pseudonym_Request_RA(request)).
+
+(* Authentication of the Pca to the vehicle *)
+query certificate:cert; event(Received_Valid_Pseodonym_Certificate_OBE(certificate)) ==> event(Sent_Valid_Pseodonym_Certificate_PCA(certificate)).
+
+(* Strong authentication of the Pca to the vehicle *)
+(* TRUE because the certificate is sent only after a request is received AND the certificate is linked to that request*)
+query certificate:cert; event(Received_Valid_Pseodonym_Certificate_OBE(certificate)) ==> inj-event(Sent_Valid_Pseodonym_Certificate_PCA(certificate)).
+
+(* Only honest vehicle can send valid message - expected: false (the attacker has a valid enrollment certificate)*)
+query message:bitstring; event(Received_Valid_Message(message)) ==> event(Sent_Valid_Message(message)).
+
+
 
 let OBESendMessage(pseudonym_cert:cert, pseudonym_pri_key:pri_key) = 
 	(* OBE can send multiple messages with the same pseudocert                   *)
@@ -148,8 +190,10 @@ let OBEReceiveMessage(pca_cert:cert) =
 	if but_check_sign(signed_message, pseudonym_pub_key) = ok() then
 	event Received_Valid_Message(full_message).
 
-let PCAPseudonym(pca_keymat:keymat, rootca_cert:cert, pca_cert:cert, ra_cert:cert) =
+let PCAPseudonym(pca_keymat:keymat, pca_cert:cert) =
 	in(pub_ch, encrypted_signed_request_from_ra:bitstring);
+	in(pub_ch, rootca_cert:cert);
+	in(pub_ch, ra_cert:cert);
 
 	(* Unpack Encrypted Request                                                  *)
 	let pca_pri_key = gen_pri_key(pca_keymat) in
@@ -157,6 +201,9 @@ let PCAPseudonym(pca_keymat:keymat, rootca_cert:cert, pca_cert:cert, ra_cert:cer
 	let (la1_plv_enc:bitstring, la2_plv_enc:bitstring, datetime:bitstring, butterfly_B:bitstring, butterfly_J:bitstring) = get_message_sign(signed_request_from_ra) in
 
 	(* Check RA Signature                                                        *)		
+	let rootca_pub_key = get_cert_pub_key(rootca_cert) in
+	if check_cert(ra_cert, rootca_pub_key)=ok() then
+
 	let ra_pub_key = get_cert_pub_key(ra_cert) in
 	if check_sign(signed_request_from_ra, ra_pub_key)=ok() then
 
@@ -171,17 +218,13 @@ let PCAPseudonym(pca_keymat:keymat, rootca_cert:cert, pca_cert:cert, ra_cert:cer
 	(* calculate linkage values                                                  *)
 	let la1_plv = adec(la1_plv_enc, pca_pri_key) in
 	let la2_plv = adec(la2_plv_enc, pca_pri_key) in
-	let la1_lv = time_linkage_value(la1_plv, datetime) in
-	let la2_lv = time_linkage_value(la2_plv, datetime) in
-	let linkage_value_old = make_linkage_value(la1_lv, la2_lv) in
-	new linkage_value_new:bitstring;
-	let linkage_value = choice[linkage_value_old, linkage_value_new] in
-
-	(* Check PCA Signature                                                       *)
-	(* Check CRL                                                                 *)
+	let la1_lv = datetime_linkage_value(la1_plv, datetime) in
+	let la2_lv = datetime_linkage_value(la2_plv, datetime) in
+	let linkage_value = make_linkage_value(la1_lv, la2_lv) in
+	
 	(* sign new pseudonym cert and send back                                     *)
 	let new_cert = make_cert(linkage_value, new_pub_key, pca_pri_key) in
-	let response_for_obe = (new_cert, new_pub_key, c_seed) in
+	let response_for_obe = (new_cert, new_pub_key, c_seed, scrt) in
 	let butterfly_aenc_key = but_to_pub_key(butterfly_J) in
 	let encrypted_response_for_obe = aenc(response_for_obe, butterfly_aenc_key) in
 	let signed_encrypted_response_for_obe = sign(encrypted_response_for_obe, pca_pri_key) in
@@ -189,27 +232,35 @@ let PCAPseudonym(pca_keymat:keymat, rootca_cert:cert, pca_cert:cert, ra_cert:cer
 	(* add record to table                                                       *)
 	let hash_request = hash(encrypted_signed_request_from_ra) in
 	insert pca_table(linkage_value, hash_request, la1_plv, la2_plv, new_cert);
-
 	event Sent_Valid_Pseodonym_Certificate_PCA(new_cert);
 
 	out(pub_ch, signed_encrypted_response_for_obe).
 
 
-let RAPseudonym(ra_keymat:keymat, rootca_cert:cert, eca_cert:cert, ra_cert:cert, pca_cert:cert, la1_cert:cert, la2_cert:cert) =
+let RAPseudonym(ra_keymat:keymat, ra_cert:cert, pca_cert:cert) =
 	in(pub_ch, encrypted_signed_request_from_obe:bitstring);
+	in(pub_ch, rootca_cert:cert);
+	in(pub_ch, eca_cert:cert);
+	in(pub_ch, la1_cert:cert);
+	in(pub_ch, la2_cert:cert);
 
 	(* Unpack Encrypted Request                                                  *)
 	let ra_pri_key = gen_pri_key(ra_keymat) in
 	let signed_request_from_obe = adec(encrypted_signed_request_from_obe, ra_pri_key) in
 	let (obe_enrollment_cert:cert, butterfly_A:bitstring, butterfly_H:bitstring, fk:bitstring, fe:bitstring) = get_message_sign(signed_request_from_obe) in
 	
-	(* Check Certiciate                                                          *)
+	(* Check ECA Certificate													*)
+	let rootca_pub_key = get_cert_pub_key(rootca_cert) in
+	if check_cert(eca_cert, rootca_pub_key)=ok() then
+
+	(* Check Enrolment Certificate                                              *)
 	let eca_pub_key = get_cert_pub_key(eca_cert) in
 	if check_cert(obe_enrollment_cert, eca_pub_key)=ok() then
 
 	(* Check CRL                                                                 *)
 	let cert_id = get_cert_id(obe_enrollment_cert) in
-	get crl(=cert_id) in
+	
+	get crl(=cert_id) in (*possible tests with revoked certs*)
 	event Message_Discarded_Revoked_Certificate(cert_id); 0
 	else
 
@@ -219,27 +270,35 @@ let RAPseudonym(ra_keymat:keymat, rootca_cert:cert, eca_cert:cert, ra_cert:cert,
 
 	event Received_Valid_Pseudonym_Request_RA(signed_request_from_obe);
 
-	(* get prelinkage values                                                     *)
+	(* get and check prelinkage values	                                           *)
 	in(pub_ch, la1_plv_sign_enc:bitstring);
 	in(pub_ch, la2_plv_sign_env:bitstring);
 
-    
-    let la1_pub_key = get_cert_pub_key(la1_cert) in
+	
+	if check_cert(la1_cert, rootca_pub_key)=ok() then
+	let la1_pub_key = get_cert_pub_key(la1_cert) in
 	if check_sign(la1_plv_sign_enc, la1_pub_key)=ok() then
-    event received_plv_from_la1_RA(la1_plv_sign_enc);
-
-
-    let la2_pub_key = get_cert_pub_key(la2_cert) in
+	event received_plv_from_la1_RA(la1_plv_sign_enc);
+	let (la1_plv_enc:bitstring) = get_message_sign(la1_plv_sign_enc) in
+	
+	
+	if check_cert(la2_cert, rootca_pub_key)=ok() then
+	let la2_pub_key = get_cert_pub_key(la2_cert) in
 	if check_sign(la2_plv_sign_env, la2_pub_key)=ok() then
-    event received_plv_from_la2_RA(la2_plv_sign_env);
+	event received_plv_from_la2_RA(la2_plv_sign_env); 
+	let (la2_plv_env:bitstring) = get_message_sign(la2_plv_sign_env) in
+	
+	
+	
 	new datetime:bitstring;
+	
 
 	(* buttefly Expand                                                           *)
 	let butterfly_B = but_add(butterfly_A, but_expand(fk)) in
 	let butterfly_J = but_add(butterfly_H, but_expand(fe)) in
 
 	(* request PCA pseudonym certificate                                         *)
-	let request_for_pca = (get_message_sign(la1_plv_sign_enc), get_message_sign(la2_plv_sign_env), datetime, butterfly_B, butterfly_J) in
+	let request_for_pca = (la1_plv_enc, la2_plv_env, datetime, butterfly_B, butterfly_J) in
 	let signed_request_for_pca = sign(request_for_pca, ra_pri_key) in
 	let pca_pub_key = get_cert_pub_key(pca_cert) in
 	let encrypted_signed_request_for_pca = aenc(signed_request_for_pca, pca_pub_key) in
@@ -253,18 +312,18 @@ let RAPseudonym(ra_keymat:keymat, rootca_cert:cert, eca_cert:cert, ra_cert:cert,
 	out(pub_ch, response_from_pca).
 
 let LAPseudonym(la_keymat:keymat, pca_cert:cert) = 
-	new pre_linkage_value:bitstring;
-	
+	new val:bitstring;
+
 	let pca_pub_key = get_cert_pub_key(pca_cert) in
-	let encrypted_request_for_pca = aenc(pre_linkage_value, pca_pub_key) in
+
+	(*sign the plvs with LA SK*)
 	let la_pri_key = gen_pri_key(la_keymat) in
-    let signed_encrypted_request_for_pca = sign(encrypted_request_for_pca, la_pri_key) in
+	let encrypted_request_for_pca = aenc(val, pca_pub_key) in
+	let encrypted_signed_request_for_pca = sign(encrypted_request_for_pca, la_pri_key) in
+	event sent_plv_from_LA(encrypted_signed_request_for_pca);
+	out(pub_ch, encrypted_signed_request_for_pca).
 
-	event sent_plv_from_LA(signed_encrypted_request_for_pca);
-	out(pub_ch, signed_encrypted_request_for_pca).
-
-let OBERequestPseudonym(obe_id:bitstring, obe_keymat:keymat, obe_enrollment_cert:cert, rootca_cert:cert, eca_cert:cert, ra_cert:cert, pca_cert:cert) = 
-	new a_seed:bitstring;
+let OBERequestPseudonym(obe_id:bitstring, obe_keymat:keymat, obe_enrollment_cert:cert, eca_cert:cert, ra_cert:cert) = 
 	new h_seed:bitstring;
 	new fk:bitstring;
 	new fe:bitstring;
@@ -279,33 +338,36 @@ let OBERequestPseudonym(obe_id:bitstring, obe_keymat:keymat, obe_enrollment_cert
 	out(pub_ch, encrypted_signed_request_for_ra);
 
 
-	(* sent pseudonim cert request to RA *)
+	(* sent pseudonym cert request to RA *)
 	in(pub_ch, encrypted_response_ra:bitstring);
+	in(pub_ch, rootca_cert:cert);
+	in(pub_ch, pca_cert:cert);
 
 	(* Check PCA Signature                                                       *)		
+	let rootca_pub_key = get_cert_pub_key(rootca_cert) in
+	if check_cert(pca_cert, rootca_pub_key)=ok() then
+
 	let pca_pub_key = get_cert_pub_key(pca_cert) in
 	if check_sign(encrypted_response_ra, pca_pub_key)=ok() then
 
 	let butterfly_dec_key = but_to_pri_key(but_add(h_seed, fe)) in
 	let response_ra = but_adec(get_message_sign(encrypted_response_ra), butterfly_dec_key) in
-	let (new_cert:cert, new_pub_key:bitstring, c_seed:bitstring) = response_ra in
+	let (new_cert:cert, new_pub_key:bitstring, c_seed:bitstring, scrt:bitstring) = response_ra in
 	let new_pri_key = but_to_pri_key(but_add(but_add(a_seed, fk), c_seed)) in
 
 	event Received_Valid_Pseodonym_Certificate_OBE(new_cert);
-
 	(* SendMessage and Receive Messages *)
 	!OBESendMessage(new_cert, new_pri_key).
 
 
-free rootca_keymat:keymat [private].
-
+free rootca_keymat:keymat.
 process
 	(* Create RootCA keymaterial, public key and private key                     *)
 	new rootca_id:bitstring;
 	let rootca_pri_key = gen_pri_key(rootca_keymat) in
 	let rootca_pub_key = gen_pub_key(rootca_keymat) in
 	let rootca_cert = make_cert(rootca_id, rootca_pub_key, rootca_pri_key) in
-	out(pub_ch, rootca_cert);
+	out(pub_ch, (rootca_keymat, rootca_cert));
 
 	(* Create ECA                                                                *)
 	new eca_keymat:keymat;
@@ -314,17 +376,21 @@ process
 	let eca_pub_key = gen_pub_key(eca_keymat) in
 	let eca_cert = make_cert(eca_id, eca_pub_key, rootca_pri_key) in
 	out(pub_ch, eca_cert);
+    event Publish_Cert_ECA(eca_cert);
 
 	(* Create RA                                                                 *)
 	new ra_keymat:keymat;
 	new ra_id:bitstring;
+	let ra_pri_key = gen_pri_key(ra_keymat) in
 	let ra_pub_key = gen_pub_key(ra_keymat) in
 	let ra_cert = make_cert(ra_id, ra_pub_key, rootca_pri_key) in
 	out(pub_ch, ra_cert);
+    event Publish_Cert_RA(ra_cert);
 
 	(* Create PCA                                                                *)
 	new pca_keymat:keymat;
 	new pca_id:bitstring;
+	let pca_pri_key = gen_pri_key(pca_keymat) in
 	let pca_pub_key = gen_pub_key(pca_keymat) in
 	let pca_cert = make_cert(pca_id, pca_pub_key, rootca_pri_key) in
 	out(pub_ch, pca_cert);
@@ -332,7 +398,7 @@ process
 	(* Create LA1                                                                *)
 	new la1_keymat:keymat;
 	new la1_id:bitstring;
-    let la1_pri_key = gen_pri_key(la1_keymat) in
+	let la1_pri_key = gen_pri_key(la1_keymat) in
 	let la1_pub_key = gen_pub_key(la1_keymat) in
 	let la1_cert = make_cert(la1_id, la1_pub_key, rootca_pri_key) in
 	out(pub_ch, la1_cert);
@@ -340,7 +406,6 @@ process
 	(* Create LA2                                                                *)
 	new la2_keymat:keymat;
 	new la2_id:bitstring;
-	let la2_pri_key = gen_pri_key(la2_keymat) in
 	let la2_pub_key = gen_pub_key(la2_keymat) in
 	let la2_cert = make_cert(la2_id, la2_pub_key, rootca_pri_key) in
 	out(pub_ch, la2_cert);
@@ -348,6 +413,7 @@ process
 	(* Create MA                                                                 *)
 	new ma_keymat:keymat;
 	new ma_id:bitstring;
+	let ma_pri_key = gen_pri_key(ma_keymat) in
 	let ma_pub_key = gen_pub_key(ma_keymat) in
 	let ma_cert = make_cert(ma_id, ma_pub_key, rootca_pri_key) in
 	out(pub_ch, ma_cert);
@@ -359,10 +425,21 @@ process
 		let obe_pub_key = gen_pub_key(obe_keymat) in
 		let obe_enrollment_cert = make_cert(obe_id, obe_pub_key, eca_pri_key) in
 		out(pub_ch, obe_enrollment_cert);
-		!(OBERequestPseudonym(obe_id, obe_keymat, obe_enrollment_cert, rootca_cert, eca_cert, ra_cert, pca_cert))
+        event Sent_Valid_Enrollment_Cert_ECA(obe_enrollment_cert);
+		!(OBERequestPseudonym(obe_id, obe_keymat, obe_enrollment_cert, eca_cert, ra_cert))
 	)
+	(* Attacker certificate provisioning *)
+	(*)
+	| (
+		new attacker_keymat:keymat;
+		let attacker_pub_key = gen_pub_key(attacker_keymat) in
+		let attacker_enrollment_cert = make_cert(attacker_id, attacker_pub_key, eca_pri_key) in
+		event Sent_Valid_Attacker_Cert_ECA(attacker_enrollment_cert);
+        out(pub_ch, (attacker_id, attacker_keymat, attacker_enrollment_cert))
+	)
+	*)
 	| !OBEReceiveMessage(pca_cert)
-	| !RAPseudonym(ra_keymat, rootca_cert, eca_cert, ra_cert, pca_cert, la1_cert, la2_cert)
-	| !PCAPseudonym(pca_keymat, rootca_cert, pca_cert, ra_cert)
+	| !RAPseudonym(ra_keymat, ra_cert, pca_cert)
+	| !PCAPseudonym(pca_keymat, pca_cert)
 	| !LAPseudonym(la1_keymat, pca_cert)
 	| !LAPseudonym(la2_keymat, pca_cert)

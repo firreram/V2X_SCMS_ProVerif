@@ -1,17 +1,17 @@
 (*
 	This file contains the implementation in ProVerif of the SCMS Pseudonym Certificate provisioning phase. 
+	General sanity checks are implemented in order to verify the correctness of the protocol.	
   	The following properties are checked:
 		1. ECA sends enrollment certificate to OBE
 		2. Attacker gets enrollment certificate from SCMS
 		3. Valid messages are exchanged between OBEs
 		4. Certificates are never revoked
 		5. Only LA sends linkage values to RA
-		6. PCA response for OBE is secret
+		6. OBE request butterfly seed is confidential and PCA response for OBE is confidential
 		7. Ra can receive pseudonym requests only from honest vehicles
 		8. Authentication of the Ra to the Pca
 		9. Authentication of the Pca to the vehicle
 		10. Only honest vehicles can send valid messages
-		11. Butterfly key expansion seed is secret.
 *)
 (* ----------------------------------------------------------------------------- *)
 (* ProVerif SCMS Pseudonym Certificate Provisioning                               *)
@@ -24,15 +24,15 @@ Verification summary:
 3.1.Query not event(Sent_Valid_Message(msg)) is false.
 3.2.Query not event(Received_Valid_Message(msg)) is false.
 4.	Query not event(Message_Discarded_Revoked_Certificate(certid)) is true.
-5.1.Query event(received_plv_from_la1_RA(plv)) ==> event(sent_plv_from_LA(plv)) is false.
-5.2.Query event(received_plv_from_la2_RA(plv)) ==> event(sent_plv_from_LA(plv)) is false.
-6.	Query not attacker(scrt[]) is true.
+5.1.Query event(received_plv_from_la1_RA(plv)) ==> event(sent_plv_from_LA(plv)) is true.
+5.2.Query event(received_plv_from_la2_RA(plv)) ==> event(sent_plv_from_LA(plv)) is true.
+6.1	Query not attacker(scrt[]) is true.
+6.2	Query not attacker(a_seed[]) is true.
 7.	Query event(Received_Valid_Pseudonym_Request_RA(request)) ==> event(Sent_Valid_Pseudonym_Request_OBE(request)) is true.
 8.	Query event(Received_Valid_Pseudonym_Request_PCA(request)) ==> event(Sent_Valid_Pseudonym_Request_RA(request)) is true.
 9.1.Query event(Received_Valid_Pseodonym_Certificate_OBE(certificate)) ==> event(Sent_Valid_Pseodonym_Certificate_PCA(certificate)) is true.
 9.2.Query inj-event(Received_Valid_Pseodonym_Certificate_OBE(certificate)) ==> inj-event(Sent_Valid_Pseodonym_Certificate_PCA(certificate)) is true.
 10.	Query event(Received_Valid_Message(message_1)) ==> event(Sent_Valid_Message(message_1)) is true.
-11.	Query not attacker(a_seed[]) is true.
 ----------------------------------------------------------------------------------------------------------------------------
 *)
 
@@ -274,13 +274,15 @@ let RAPseudonym(ra_keymat:keymat, rootca_cert:cert, eca_cert:cert, ra_cert:cert,
 	
 	let la1_pub_key = get_cert_pub_key(la1_cert) in
 	if check_sign(la1_plv_sign_enc, la1_pub_key)=ok() then
+	event received_plv_from_la1_RA(la1_plv_sign_enc);
 	let (la1_plv_enc:bitstring) = get_message_sign(la1_plv_sign_enc) in
-	event received_plv_from_la1_RA(la1_plv_enc);
+	
 	
 	let la2_pub_key = get_cert_pub_key(la2_cert) in
-	if check_sign(la2_plv_sign_env, la2_pub_key)=ok() then 
+	if check_sign(la2_plv_sign_env, la2_pub_key)=ok() then
+	event received_plv_from_la2_RA(la2_plv_sign_env); 
 	let (la2_plv_env:bitstring) = get_message_sign(la2_plv_sign_env) in
-	event received_plv_from_la2_RA(la2_plv_env);
+	
 	
 	
 	new datetime:bitstring;
@@ -313,6 +315,7 @@ let LAPseudonym(la_keymat:keymat, pca_cert:cert) =
 	let la_pri_key = gen_pri_key(la_keymat) in
 	let encrypted_request_for_pca = aenc(val, pca_pub_key) in
 	let encrypted_signed_request_for_pca = sign(encrypted_request_for_pca, la_pri_key) in
+	
 	event sent_plv_from_LA(encrypted_signed_request_for_pca);
 	out(pub_ch, encrypted_signed_request_for_pca).
 

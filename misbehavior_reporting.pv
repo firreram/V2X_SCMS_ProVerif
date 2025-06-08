@@ -1,5 +1,4 @@
 (*Misbehaviour reporting and certificate revocationof the SCMS proposal for V2X infrastructure. 
-  FUTURE WORK: add the revocation using Linkange Seeds(LS), this will not only revoke the current pseudonym certificate but also the future ones.
 *)
 (*
 	This file contains the implementation in ProVerif of the SCMS Pseudonym Certificate misbehavior reporting and revocation phase. 

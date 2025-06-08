@@ -1,5 +1,6 @@
 (*Misbehaviour reporting and certificate revocationof the SCMS proposal for V2X infrastructure. 
-  Modifications to the original SCMS proposal are highlighted in the comments.
+  EXPERIMENTAL FILE.
+  A modification was made in order to send the report on the public channel in order to verify MA authentication. 
   FUTURE WORK: add the revocation using Linkange Seeds(LS), this will not only revoke the current pseudonym certificate but also the future ones.
 *)
 (*
